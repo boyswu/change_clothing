@@ -7,7 +7,7 @@ port = 3306
 user = 'root'
 # password = 'team2111'
 password = 'team2111..'  #实验室
-database = 'sign_in_system'
+database = 'change_clothes'
 
 
 # def connect_sql():

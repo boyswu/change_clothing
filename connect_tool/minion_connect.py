@@ -12,4 +12,4 @@ secret_key = "team2111.."
 secure = False  # 如果使用 HTTPS 设置为 True
 
 # 创建 MinIO 客户端
-client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
+minio_client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)

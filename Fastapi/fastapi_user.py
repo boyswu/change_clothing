@@ -3,6 +3,7 @@ import threading
 import random
 import asyncio
 from decimal import Decimal, ROUND_DOWN
+from pathlib import Path
 from fastapi import Form, File, UploadFile, Depends, APIRouter
 from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
@@ -16,6 +17,7 @@ import Tool.minion_bag as minion_bag
 import Tool.Threading_await as Threading_await
 # from Tool.face_recognize import face_recognize
 from Tool.upload import upload_files
+from Tool.downland_url import download_url, upload_local_file
 from Tool.API import change_clothes_api, get_result_api
 from connect_tool.sql import MySQLConnectionPool
 
@@ -340,14 +342,7 @@ async def upload_file(file: UploadFile = File(...), access_Token: dict = Depends
         db_pool.close_connection(conn)
 
 
-async def upload_file_to_minion(bucket_name, object_name, file_path, content_type):
-    loop = asyncio.get_event_loop()
-    # 使用线程池提交任务
-    msg = await loop.run_in_executor(executor, minion_bag.UploadObject, bucket_name, object_name, file_path,
-                                     content_type, False)
-    return msg
-
-
+# TODO:注册时候需要以手机号创建桶，并创建两个文件夹，一个放生成的图片作历史代存区，一个放txt文件记录用户ai对话
 # minion建文件夹放置每一次的照片(共三张)生成的图片单独放置在一个文件夹里，文件夹和生成的图片以时间戳命名，并返回文件夹路径
 @router.get("/change_clothes/get_file", summary="获取模版照片",
             description="1.fit_type只接受，FULL_BODY：全身换装，HALF_BODY:半身换装，两种类型参数。"
@@ -364,6 +359,9 @@ async def get_file(fit_type: str = Form(...), models: UploadFile = File(...), to
     user_phone = access_Token.get('sub')
     # 时间戳
     timestamp = int(datetime.now().timestamp())
+    """
+        时间格式字符串是否支持
+    """
     # 转成字符串
     folder_name = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
 
@@ -373,7 +371,7 @@ async def get_file(fit_type: str = Form(...), models: UploadFile = File(...), to
         {"file": tops},
         {"file": pants},
     ]
-    minion_bag.create_folder(user_phone, folder_name)  # minion的桶里创建文件夹以时间戳命名
+    minion_bag.create_folder(user_phone, folder_name)  # minion的桶里创建文件夹存放三张模板图片以时间戳命名
 
     upload_results = []
     for data in file_data:
@@ -382,7 +380,7 @@ async def get_file(fit_type: str = Form(...), models: UploadFile = File(...), to
         content_type = data['file'].content_type
 
         try:
-            msg = await upload_file_to_minion(user_phone, object_name, file_path, content_type)
+            msg = await Threading_await.upload_file_to_minion_bag_2(user_phone, object_name, file_path, content_type)
             if not msg:
                 return JSONResponse(
                     content={"msg": False, "error": f"上传文件 {data['file'].filename} 失败", "status_code": 400})
@@ -409,31 +407,50 @@ async def get_file(fit_type: str = Form(...), models: UploadFile = File(...), to
     pants_url = urls.get("pants_url")
     result_keys = change_clothes_api(fit_type, models_url, tops_url, pants_url)
     url = get_result_api(result_keys)
-    if url is 'RUNNING':
-        return JSONResponse(content={"msg": False, "error": "生成图片中，请稍后再试", "status_code": 400})
-    elif url is False:
-        minion_bag.delete_folder(user_phone, folder_name)  # minion的桶里删除文件夹
-        return JSONResponse(content={"msg": False, "error": "生成图片失败", "status_code": 400})
-    else:
-        conn = db_pool.get_connection()
-        try:
-            with conn.cursor() as cursor:
+    conn = db_pool.get_connection()
+    try:
+        with conn.cursor() as cursor:
+            if url is 'RUNNING':
                 sql = ("INSERT INTO file_list (file_id, phone,folder_name,url) "
-                       "VALUES ('{}', '{}', '{}', '{}')").format(result_keys, user_phone, folder_name, url)
+                       "VALUES ('{}', '{}', '{}')").format(result_keys, user_phone, folder_name)
                 cursor.execute(sql)
                 conn.commit()
                 if cursor.rowcount > 0:
-                    return JSONResponse(content={"msg": True, "info": {"file_url": url}, "status_code": 200})
+                    return JSONResponse(content={"msg": False, "error": "生成图片中，请稍后再试", "status_code": 400})
                 else:
-                    return JSONResponse(content={"msg": False, "error": "上传失败", "status_code": 400})
-        except Exception as e:
-            conn.rollback()
-            return JSONResponse(content={"msg": False, "error": str(e), "status_code": 400})
-        finally:
-            db_pool.close_connection(conn)
+                    return JSONResponse(content={"msg": False, "error": "保存数据库失败", "status_code": 400})
+
+            elif url is False:
+                minion_bag.delete_folder(user_phone, folder_name)  # minion的桶里删除文件夹
+                return JSONResponse(content={"msg": False, "error": "生成图片失败", "status_code": 400})
+            else:
+                file_path = download_url(url, folder_name)  # folder_name为时间戳字符串
+                if file_path is False:
+                    return JSONResponse(content={"msg": False, "error": "下载图片失败", "status_code": 400})
+                else:
+                    # 上传本地文件到minion的桶
+                    upload_local_file(user_phone, file_path, folder_name)
+                    if not upload_local_file:
+                        return JSONResponse(content={"msg": False, "error": "上传图片失败", "status_code": 400})
+
+                    result_url = f"http://43.143.229.40:9000/{'image'}/{'photo'}_{folder_name}"
+                    sql = ("INSERT INTO file_list (file_id, phone,folder_name,url) "
+                           "VALUES ('{}', '{}', '{}', '{}')").format(result_keys, user_phone, folder_name, result_url)
+                    cursor.execute(sql)
+                    conn.commit()
+                    if cursor.rowcount > 0:
+                        return JSONResponse(content={"msg": True, "info": {"file_url": result_url}, "status_code": 200})
+                    else:
+                        return JSONResponse(content={"msg": False, "error": "上传失败", "status_code": 400})
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(content={"msg": False, "error": str(e), "status_code": 400})
+    finally:
+        db_pool.close_connection(conn)
 
 
-@router.get("/change_clothes/get_file_url", summary="获取图片下载链接", description="需要传入result_keys以获取图片下载链接",
+@router.get("/change_clothes/get_file_url", summary="获取图片下载链接",
+            description="需要传入result_keys以获取图片下载链接",
             tags=['奇迹衣衣'])
 async def get_file_url(result_keys: str, access_Token: dict = Depends(token.verify_token)):
     """
@@ -445,11 +462,12 @@ async def get_file_url(result_keys: str, access_Token: dict = Depends(token.veri
     conn = db_pool.get_connection()
     try:
         with conn.cursor() as cursor:
-            sql = "SELECT url,folder_name FROM file_list WHERE file_id = '{}'and phone = '{}'".format(result_keys,user_phone)
+            sql = "SELECT url,folder_name FROM file_list WHERE file_id = '{}'and phone = '{}'".format(result_keys,
+                                                                                                      user_phone)
             cursor.execute(sql)
             result = cursor.fetchone()
-            if result:
-                url, folder_name = result[0], result[1]
+            url, folder_name = result[0], result[1]
+            if url is not None:
                 return JSONResponse(content={"msg": True, "info": {"file_url": url}, "status_code": 200})
             else:
                 url = get_result_api(result_keys)
@@ -458,7 +476,14 @@ async def get_file_url(result_keys: str, access_Token: dict = Depends(token.veri
                 elif url is False:
                     return JSONResponse(content={"msg": False, "error": "生成图片失败", "status_code": 400})
                 else:
-                    #
+                    file_path = download_url(url, user_phone)
+                    if file_path is False:
+                        return JSONResponse(content={"msg": False, "error": "下载图片失败", "status_code": 400})
+                    # 上传本地文件到minion的桶
+                    upload_local_file(user_phone, file_path, folder_name)
+                    if not upload_local_file:
+                        return JSONResponse(content={"msg": False, "error": "上传图片失败", "status_code": 400})
+
                     sql = "UPDATE file_list SET url = '{}' WHERE file_id = '{}'".format(url, result_keys)
                     cursor.execute(sql)
                     conn.commit()

@@ -29,13 +29,13 @@ def send_email(receiver_email):
     security_code = generate_security_code()  # 使用随机生成的验证码
     # 创建邮件
     message = MIMEMultipart()
-    nickname = "咔咔"  # 中文昵称
+    nickname = "奇迹衣衣"  # 中文昵称
     encoded_nickname = base64_encode_nickname(nickname)
 
     # 设置邮件头部
     message["From"] = f"{encoded_nickname} <{sender_email}>"
     message["To"] = receiver_email
-    message["Subject"] = f"咔咔 -邮箱验证码：{security_code}"
+    message["Subject"] = f"奇迹衣衣 -邮箱验证码：{security_code}"
     # 邮件正文
     body = f"这是您的验证码:{security_code}请尽快进行验证。此邮件为系统邮件，请勿回复。"
     message.attach(MIMEText(body, "plain"))
@@ -67,13 +67,13 @@ def send_warning_email(receiver_email):
     password = "lrqropzxnbmydcff"
     # 创建邮件
     message = MIMEMultipart()
-    nickname = "咔咔"  # 中文昵称
+    nickname = "奇迹衣衣"  # 中文昵称
     encoded_nickname = base64_encode_nickname(nickname)
 
     # 设置邮件头部
     message["From"] = f"{encoded_nickname} <{sender_email}>"
     message["To"] = receiver_email
-    message["Subject"] = f"咔咔 -签退警告"
+    message["Subject"] = f"奇迹衣衣 -签退警告"
     # 邮件正文
     body = f"签退超时，本次签到记录清零，保留未签退记录,给予一次警告。此邮件为系统邮件，请勿回复。"
     message.attach(MIMEText(body, "plain"))

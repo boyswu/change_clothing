@@ -52,6 +52,7 @@ executor = ThreadPoolExecutor(max_workers=10)  # 线程池最大线程数为10
 """
 
 
+# TODO: 添加sql和桶存在bug
 @router.post("/change_clothes/register", summary="注册用户", description="注册用户", tags=['奇迹衣衣'])
 async def register_user(register: ToDoModel.register_user):
     """
@@ -61,32 +62,40 @@ async def register_user(register: ToDoModel.register_user):
     Name = register.Name
     Password = password_utf.encrypt_password(register.Password)
     Email = register.Email
-    Permissions = '0'  # 默认权限为0
+
+    # 验证输入信息是否为空
+    if not all([user_phone, Name, Password, Email]):
+        return JSONResponse(content={"msg": False, "error": "信息不能为空", "status_code": 400})
 
     conn = db_pool.get_connection()
-    # 验证用户是否存在
     try:
         with conn.cursor() as cursor:
-            sql = "SELECT * FROM minion_user WHERE user_phone = '{}'".format(user_phone)
-            cursor.execute(sql)
-            result = cursor.fetchone()
-            if result:
+            # 验证用户是否存在
+            sql = "SELECT * FROM user WHERE phone = %s"
+            cursor.execute(sql, (user_phone,))
+            if cursor.fetchone():
                 return JSONResponse(content={"msg": False, "error": "用户已存在", "status_code": 400})
-            try:
-                sql = "INSERT INTO minion_user (user_phone, Name, Password,Email,Permissions) VALUES (%s, %s, %s, %s, %s)"
-                cursor.execute(sql, (user_phone, Name, Password, Email, Permissions))
-                conn.commit()
-                # 创建一个桶
-                bucket_name = user_phone
-                if minion_bag.CreateBucket(bucket_name) is True:
-                    return JSONResponse(content={"msg": True, "data": "注册成功", "status_code": 200})
-                elif minion_bag.CreateBucket(bucket_name) is None:
-                    return JSONResponse(content={"msg": False, "error": "桶名重复", "status_code": 400})
-                else:
-                    return JSONResponse(content={"msg": False, "error": "创建桶失败", "status_code": 400})
 
-            except Exception as e:
-                return JSONResponse(content={"msg": False, "error": str(e), "status_code": 400})
+            # 生成随机图片URL
+            picture_url = f'http://43.143.229.40:9000/photo5/{random.randint(1, 6)}.jpg'
+
+            # 插入用户数据
+            sql = "INSERT INTO user (phone, user_name, password, email, head_portrait) VALUES (%s, %s, %s, %s, %s)"
+            cursor.execute(sql, (user_phone, Name, Password, Email, picture_url))
+            conn.commit()
+
+            # 创建桶和文件夹
+            if not (bucket_creation_result := minion_bag.CreateBucket(user_phone)):
+                error_msg = "桶名重复" if bucket_creation_result is None else "创建桶失败"
+                return JSONResponse(content={"msg": False, "error": error_msg, "status_code": 400})
+
+            if not minion_bag.create_folder(user_phone, 'image'):
+                return JSONResponse(content={"msg": False, "error": "创建图片文件夹失败", "status_code": 400})
+
+            if not minion_bag.create_folder(user_phone, 'chat_record'):
+                return JSONResponse(content={"msg": False, "error": "创建对话记录文件夹失败", "status_code": 400})
+
+            return JSONResponse(content={"msg": True, "data": "注册成功", "status_code": 200})
 
     except Exception as e:
         return JSONResponse(content={"msg": False, "error": str(e), "status_code": 400})
@@ -105,12 +114,12 @@ async def login(login: ToDoModel.login_user):
     conn = db_pool.get_connection()
     try:
         with conn.cursor() as cursor:
-            sql = "SELECT * FROM user WHERE id = '{}' AND password = '{}' ".format(user_phone, Password)
+            sql = "SELECT * FROM user WHERE phone = '{}' AND password = '{}' ".format(user_phone, Password)
             cursor.execute(sql)
             result = cursor.fetchall()
             if result:
-                Name = result[0][1]
-                Picture = result[0][3]
+                Name = result[0][0]
+                Picture = result[0][4]
                 access_token_expires = timedelta(minutes=token.ACCESS_TOKEN_EXPIRE_MINUTES)
                 access_token = token.create_access_token(data={"sub": user_phone}, expires_delta=access_token_expires)
                 if token.verify_token(access_token) is False:  # 有这样一个方法判断token是否过期
@@ -120,7 +129,7 @@ async def login(login: ToDoModel.login_user):
                         content={"msg": True, "user_phone": user_phone, "Name": Name, "picture": Picture,
                                  'token': access_token, "status_code": 200})
             else:
-                return JSONResponse(content={"msg": False, "error": "学号或密码错误", "status_code": 400})
+                return JSONResponse(content={"msg": False, "error": "手机号或密码错误", "status_code": 400})
     except Exception as e:
         return JSONResponse(content={"msg": False, "error": str(e), "status_code": 400})
     finally:
@@ -140,13 +149,13 @@ async def protected_route(access_Token: dict = Depends(token.verify_token)):
     conn = db_pool.get_connection()
     try:
         with conn.cursor() as cursor:
-            sql = "SELECT * FROM user WHERE id = '{}'".format(user_phone)
+            sql = "SELECT * FROM user WHERE phone = '{}'".format(user_phone)
             cursor.execute(sql)
             result = cursor.fetchall()
 
             if result:
-                Name = result[0][1]
-                Picture = result[0][3]
+                Name = result[0][0]
+                Picture = result[0][4]
                 access_token_expires = timedelta(minutes=token.ACCESS_TOKEN_EXPIRE_MINUTES)
                 access_token = token.create_access_token(data={"sub": user_phone}, expires_delta=access_token_expires)
                 return JSONResponse(
@@ -270,7 +279,7 @@ async def change_password(pd: ToDoModel.change_password, access_Token: dict = De
     try:
         with conn.cursor() as cursor:
 
-            sql = "UPDATE user SET password = '{}' WHERE id = '{}'".format(password, user_phone)
+            sql = "UPDATE user SET password = '{}' WHERE phone = '{}'".format(password, user_phone)
             cursor.execute(sql)
             conn.commit()
             if cursor.rowcount > 0:
@@ -297,7 +306,7 @@ async def upload_file(file: UploadFile = File(...), access_Token: dict = Depends
     conn = db_pool.get_connection()
     try:
         with conn.cursor() as cursor:
-            sql_select = "SELECT picture FROM user WHERE id = '{}'".format(user_phone)
+            sql_select = "SELECT picture FROM user WHERE phone = '{}'".format(user_phone)
             cursor.execute(sql_select)
             result = cursor.fetchone()
 
@@ -330,7 +339,7 @@ async def upload_file(file: UploadFile = File(...), access_Token: dict = Depends
             os.remove(file_path)
             file_url = f'http://43.143.229.40:9000/{Bucket_name}/{object_name}'
             # 更新用户头像
-            sql = "UPDATE user SET picture = '{}' WHERE id = '{}'".format(file_url, user_phone)
+            sql = "UPDATE user SET picture = '{}' WHERE phone = '{}'".format(file_url, user_phone)
             cursor.execute(sql)
             conn.commit()
             return JSONResponse(content={"msg": True, "info": {"file_url": file_url}, "status_code": 200})
@@ -518,6 +527,38 @@ async def get_file_list(access_Token: dict = Depends(token.verify_token)):
                 return JSONResponse(content={"msg": True, "info": {"file_list": result}, "status_code": 200})
             else:
                 return JSONResponse(content={"msg": False, "error": "文件列表为空", "status_code": 400})
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(content={"msg": False, "error": str(e), "status_code": 400})
+    finally:
+        db_pool.close_connection(conn)
+
+
+# 接入deepseek
+@router.post("/change_clothes/get_deepseek_result", summary="DeepSeek聊天接口", description="获取DeepSeek结果",
+             tags=['奇迹衣衣'])
+async def get_deepseek_result(chat_text: str = Form(...), access_Token: dict = Depends(token.verify_token)):
+    """
+    获取DeepSeek结果
+    """
+    if not access_Token:
+        return JSONResponse(content={"msg": False, "error": "登录已过期,请重新登录", "status_code": 401})
+    user_phone = access_Token.get('sub')
+    conn = db_pool.get_connection()
+    try:
+        with conn.cursor() as cursor:
+            sql = "SELECT deepseek_result FROM user WHERE phone = '{}'".format(user_phone)
+            cursor.execute(sql)
+            result = cursor.fetchone()
+            if result:
+                deepseek_result = result[0]
+                if deepseek_result:
+                    return JSONResponse(
+                        content={"msg": True, "info": {"deepseek_result": deepseek_result}, "status_code": 200})
+                else:
+                    return JSONResponse(content={"msg": False, "error": "DeepSeek结果为空", "status_code": 400})
+            else:
+                return JSONResponse(content={"msg": False, "error": "用户不存在", "status_code": 400})
     except Exception as e:
         conn.rollback()
         return JSONResponse(content={"msg": False, "error": str(e), "status_code": 400})

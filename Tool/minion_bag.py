@@ -228,6 +228,9 @@ def create_folder(Bucket_name: str, Folder_name: str):
     :param Folder_name: 文件夹名称
     :return: bool
     """
+    # 确保文件夹名称以斜杠结尾
+    if not Folder_name.endswith('/'):
+        Folder_name += '/'
     # 创建一个空的内存文件对象
     data = io.BytesIO(b"")
     try:
@@ -248,6 +251,7 @@ def delete_folder(Bucket_name: str, File_name: str):
     try:
         # 检查是否是文件夹
         if File_name.endswith('/'):
+            print("delete_folder")
             # 获取所有以文件夹名称开头的对象
             objects = minio_client.list_objects(Bucket_name, prefix=File_name, recursive=True)
             objects_to_delete = [obj.object_name for obj in objects]
@@ -257,6 +261,7 @@ def delete_folder(Bucket_name: str, File_name: str):
                 minio_client.remove_object(Bucket_name, obj)
             return True
         else:
+            print("delete_file")
             # 删除单个文件
             minio_client.remove_object(Bucket_name, File_name)
             return True

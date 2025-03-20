@@ -9,7 +9,7 @@ def download_url(url: str, local_file_path: str):
     # 下载图片
     response = requests.get(url)
     # 指定保存路径
-    file_path = os.path.join(project_root, 'photo_{}'.format(local_file_path))
+    file_path = os.path.join(project_root, 'photo_{}.jpg'.format(local_file_path))
 
     # 检查请求是否成功
     if response.status_code == 200:
@@ -23,18 +23,18 @@ def download_url(url: str, local_file_path: str):
         return False
 
 
-def upload_local_file(user_phone: str, file_path: str, folder_name: str):
+async def upload_local_file(user_phone: str, file_path: str, folder_name: str):
     # 创建Path对象
     path = Path(file_path)
     # 获取文件的扩展名，不包括前面的点
     extension = path.suffix[1:]
     # 上传文件到minion的桶里
-    object_name = f"{user_phone}/{'image'}/{'photo'}_{folder_name}"
+    object_name = f"{'image'}/{'photo'}_{folder_name}.{extension}"
     content_type = f"image/{extension}"
 
-    msg = Threading_await.upload_file_to_minion_bag_2(user_phone, object_name, file_path,
-                                                      content_type)
-    if not msg:
+    msg = await Threading_await.upload_file_to_minion_bag_2(user_phone, object_name, file_path,
+                                                            content_type)
+    if msg is False:
         return False
     else:
-        return True
+        return object_name

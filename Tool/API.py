@@ -19,19 +19,22 @@ headers = {
 def change_clothes_api(fit_type, model_image, tops_image, pants_image):
     path = '/api/v1/tryon/submit'
     url = host + path
+    if fit_type not in ['FULL_BODY', 'HALF_BODY']:
+        print('fit_type参数错误')
+        return False
+
+    task = {
+        "model_image": model_image,  # 模特图,必填
+        "tops_image": tops_image  # 上装图,必填
+    }
+    if fit_type == 'FULL_BODY' and pants_image:
+        task['pants_image'] = pants_image  # 下装图,选填
+
     data = {
         "data": {
             "fit_type": fit_type,  # 换装类型枚举，FULL_BODY：全身换装，HALF_BODY:半身换装(不加裤子)
             "inference_num": 1,  # 单任务算法结果数量（1~4）
-            "task_list": [  # 任务列表,最多10项
-                {
-                    # "model_image": "http://43.143.229.40:9000/2303080206/clothes/person.jpg",  # 模特图,必填
-                    "model_image": model_image,  # 模特图,必填
-                    "tops_image": tops_image,  # 上装图,必填
-                    "pants_image": pants_image  # 下装图,选填
-                    # "mask_image": "https://img.alicdn.com/abc.png"      # 选填mask图⽚,确保上传的mask图与原图尺⼨⼀致，mask为0/255图格式
-                }
-            ]
+            "task_list": [task]  # 任务列表,最多10项
         }
     }
 
@@ -65,15 +68,15 @@ def get_result_api(result_keys):
         }
     }
     # 将字典转换为JSON字符串
-    post_data = json.dumps(data_dict)
+    bodys[''] = json.dumps(data_dict)
+    post_data = bodys['']
     response = http.request('POST', url, body=post_data, headers=headers)
     content = response.data.decode('utf-8')
-
     if content:
         result = json.loads(content)
-
         if result['code'] == 0:
             task_list = result['data']['task_list']  # task_list 是一个列表
+            # print("task_list:", task_list)
             # 确保 task_list 不为空
             task_status = task_list[0]['status']  # 获取第一个任务的状态
             if task_status == 'SUCCESS':
@@ -94,14 +97,15 @@ def get_result_api(result_keys):
         return False
 
 
-# if __name__ == '__main__':
-#     # fit_type = 'FULL_BODY'  # 换装类型枚举，FULL_BODY：全身换装，HALF_BODY:半身换装(不加裤子)
-#     # model_image = 'http://43.143.229.40:9000/2303080206/clothes/person.jpg'  # 模特图,必填
-#     # tops_image = 'http://43.143.229.40:9000/2303080206/clothes/long_clothing.jpg'  # 上装图,必填
-#     # pants_image = 'http://43.143.229.40:9000/2303080206/clothes/trousers.jpg'  # 下装图,选填
-#     # result_key = change_clothes_api(fit_type, model_image, tops_image, pants_image)
-#     # print(result_key)
-#     result_key = "049d15cbd3f64ba4b938fff33039b487"
-#
-#     pict_url = get_result_api(result_key)
-#     print(pict_url)
+if __name__ == '__main__':
+    # fit_type = 'FULL_BODY'  # 换装类型枚举，FULL_BODY：全身换装，HALF_BODY:半身换装(不加裤子)
+    # model_image = 'http://43.143.229.40:9000/2303080206/clothes/person.jpg'  # 模特图,必填
+    # tops_image = 'http://43.143.229.40:9000/2303080206/clothes/long_clothing.jpg'  # 上装图,必填
+    # pants_image = 'http://43.143.229.40:9000/2303080206/clothes/trousers.jpg'  # 下装图,选填
+    # mask_image = 'http://43.143.229.40:9000/2303080206/clothes/bai_resize.png'  # 选填mask图⽚,确保上传的mask图与原图尺⼨⼀致，mask为0/255图格式
+    #
+    # result_key = change_clothes_api(fit_type, model_image, tops_image, pants_image, mask_image)
+    # print(result_key)
+    result_key = "2947be3985ab418088bd9428478dab74"
+    pict_url = get_result_api(result_key)
+    print(pict_url)

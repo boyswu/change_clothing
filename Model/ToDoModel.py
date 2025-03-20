@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel
 from typing import Optional
 
@@ -16,12 +15,34 @@ class register_user(BaseModel):
     Email: Optional[str] = None
 
 
+class register_user_phone(BaseModel):
+    """
+    Phone:手机号
+    Name:用户名
+    Password:密码
+    Email:邮箱
+    """
+    Phone: Optional[str] = None
+    Name: Optional[str] = None
+    Password: Optional[str] = None
+    Email: Optional[str] = None
+
+
 class login_user(BaseModel):
     """
     Name:用户名
     Password:密码
     """
     User_id: Optional[str] = None
+    Password: Optional[str] = None
+
+
+class login_user_phone(BaseModel):
+    """
+    Phone:手机号
+    Password:密码
+    """
+    Phone: Optional[str] = None
     Password: Optional[str] = None
 
 
@@ -154,3 +175,10 @@ class description(BaseModel):
     Description:描述
     """
     description: Optional[str] = None
+
+
+class result_keys(BaseModel):
+    """
+    Key:密钥
+    """
+    key: Optional[str] = None

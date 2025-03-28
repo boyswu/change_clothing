@@ -3,7 +3,7 @@ from starlette.middleware.cors import CORSMiddleware
 from Fastapi import fastapi_user
 import uvicorn
 import fastapi_cdn_host
-
+# 1、声明一个 FastAPI 实例
 app = FastAPI()
 # monkey_patch_for_docs_ui(app)
 fastapi_cdn_host.patch_docs(app)

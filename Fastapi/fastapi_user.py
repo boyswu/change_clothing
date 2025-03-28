@@ -52,7 +52,6 @@ executor = ThreadPoolExecutor(max_workers=10)  # 线程池最大线程数为10
 """
 
 
-# TODO: 添加sql和桶存在bug
 @router.post("/change_clothes/register", summary="注册用户", description="注册用户", tags=['奇迹衣衣'])
 async def register_user(register: ToDoModel.register_user_phone):
     """
@@ -97,6 +96,9 @@ async def register_user(register: ToDoModel.register_user_phone):
             if not minion_bag.create_folder(user_phone, 'chat_record'):
                 return JSONResponse(content={"msg": False, "error": "创建对话记录文件夹失败", "status_code": 400})
 
+            if not minion_bag.create_folder(user_phone, 'head_portrait'):
+                return JSONResponse(content={"msg": False, "error": "创建头像文件夹失败", "status_code": 400})
+
             return JSONResponse(content={"msg": True, "data": "注册成功", "status_code": 200})
 
     except Exception as e:
@@ -117,6 +119,7 @@ async def login(login: ToDoModel.login_user_phone):
     try:
         with conn.cursor() as cursor:
             sql = "SELECT * FROM user WHERE phone = '{}' AND password = '{}' ".format(user_phone, Password)
+            print(sql)
             cursor.execute(sql)
             result = cursor.fetchall()
             if result:
@@ -318,13 +321,13 @@ async def upload_file(file: UploadFile = File(...), access_Token: dict = Depends
             else:
                 file_name = None
 
-            Bucket_name = "photo"
+            Bucket_name = user_phone
             # 时间戳
             timestamp = int(datetime.now().timestamp())
             # 上传文件的方法返回文件路径
             file_path = upload_files(file, timestamp)
 
-            object_name = f"{timestamp}_{user_phone}_{file.filename}"
+            object_name = f"{'head_portrait'}/{timestamp}_{file.filename}"
             content_type = file.content_type
 
             # 将文件上传任务交给线程池
@@ -343,7 +346,7 @@ async def upload_file(file: UploadFile = File(...), access_Token: dict = Depends
             os.remove(file_path)
             file_url = f'http://43.143.229.40:9000/{Bucket_name}/{object_name}'
             # 更新用户头像
-            sql = "UPDATE user SET picture = '{}' WHERE phone = '{}'".format(file_url, user_phone)
+            sql = "UPDATE user SET head_portrait = '{}' WHERE phone = '{}'".format(file_url, user_phone)
             cursor.execute(sql)
             conn.commit()
             return JSONResponse(content={"msg": True, "info": {"file_url": file_url}, "status_code": 200})
@@ -357,7 +360,8 @@ async def upload_file(file: UploadFile = File(...), access_Token: dict = Depends
 
 @router.post("/change_clothes/get_file", summary="获取模版照片",
              description="1.fit_type只接受，FULL_BODY：全身换装，HALF_BODY:半身换装，两种类型参数。"
-                         "2.上传正身照,上衣照,下装照，并要求照片开头分别命名为：models,tops,pants",
+                         "2.models、tops、pants参数分别为模型、上衣、裤子图片。"
+                         "3.全身换装：可不上传裤子,仅上传连衣裙图片(上装必须上传)。半身换装：仅支持上传上装图片,模特照片里的裤子会保留。",
              tags=['奇迹衣衣'])
 async def get_file(fit_type: str = Form(...), models: UploadFile = File(...), tops: UploadFile = File(...),
                    pants: UploadFile = File(default=None),
@@ -423,7 +427,7 @@ async def get_file(fit_type: str = Form(...), models: UploadFile = File(...), to
                 minion_bag.delete_folder(user_phone, folder_name)
                 return JSONResponse(content={"msg": False, "error": "保存数据库失败", "status_code": 400})
             else:
-                return JSONResponse(content={"msg": False, "error": "生成图片中，请稍后再试", "status_code": 400})
+                return JSONResponse(content={"msg": True, "info": {"result_keys": result_keys}, "status_code": 200})
     except Exception as e:
         print("上传文件失败")
         minion_bag.delete_folder(user_phone, folder_name)
@@ -438,8 +442,8 @@ async def get_file(fit_type: str = Form(...), models: UploadFile = File(...), to
 
 
 @router.post("/change_clothes/get_file_url", summary="获取图片下载链接",
-            description="需要传入result_keys以获取图片下载链接",
-            tags=['奇迹衣衣'])
+             description="需要传入result_keys以获取图片下载链接",
+             tags=['奇迹衣衣'])
 async def get_file_url(keys: ToDoModel.result_keys, access_Token: dict = Depends(token.verify_token)):
     """
     获取图片下载链接

@@ -27,7 +27,7 @@ def change_clothes_api(fit_type, model_image, tops_image, pants_image):
         "model_image": model_image,  # 模特图,必填
         "tops_image": tops_image  # 上装图,必填
     }
-    if fit_type == 'FULL_BODY' and pants_image:
+    if fit_type == 'HALF_BODY' and pants_image:
         task['pants_image'] = pants_image  # 下装图,选填
 
     data = {
@@ -74,6 +74,7 @@ def get_result_api(result_keys):
     content = response.data.decode('utf-8')
     if content:
         result = json.loads(content)
+        print(result)
         if result['code'] == 0:
             task_list = result['data']['task_list']  # task_list 是一个列表
             # print("task_list:", task_list)
@@ -98,14 +99,15 @@ def get_result_api(result_keys):
 
 
 if __name__ == '__main__':
-    # fit_type = 'FULL_BODY'  # 换装类型枚举，FULL_BODY：全身换装，HALF_BODY:半身换装(不加裤子)
+    # fit_type = 'HALF_BODY'  # 换装类型枚举，FULL_BODY：全身换装，HALF_BODY:半身换装(不加裤子)
     # model_image = 'http://43.143.229.40:9000/2303080206/clothes/person.jpg'  # 模特图,必填
-    # tops_image = 'http://43.143.229.40:9000/2303080206/clothes/long_clothing.jpg'  # 上装图,必填
-    # pants_image = 'http://43.143.229.40:9000/2303080206/clothes/trousers.jpg'  # 下装图,选填
-    # mask_image = 'http://43.143.229.40:9000/2303080206/clothes/bai_resize.png'  # 选填mask图⽚,确保上传的mask图与原图尺⼨⼀致，mask为0/255图格式
-    #
-    # result_key = change_clothes_api(fit_type, model_image, tops_image, pants_image, mask_image)
+    # tops_image = 'http://43.143.229.40:9000/2303080206/clothes/short_clothing.jpg'  # 上装图,必填
+    # pants_image = 'https://img.alicdn.com/imgextra/i3/O1CN01hOE0jo1ZnyBltsGnF_!!6000000003240-2-tps-1000-1000.png'  # 下装图,选填
+    # result_key = change_clothes_api(fit_type, model_image, tops_image, pants_image)
     # print(result_key)
-    result_key = "2947be3985ab418088bd9428478dab74"
+    result_key = "b5fa0abd833a40908f0bf42e30a06da7" #half body 加裤子
+    # result_key = "318c9869c5234db6b12d763bf303ec0d" #full body 加裤子
+    # result_key = "318c9869c5234db6b12d763bf303ec0d" #full body 不加裤子
+    # result_key = "702b9a2d1125463b94decbdec1fef009" #half body 不加裤子
     pict_url = get_result_api(result_key)
     print(pict_url)

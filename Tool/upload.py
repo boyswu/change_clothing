@@ -2,7 +2,6 @@
 保存文件
 """
 import os
-from datetime import datetime
 
 
 def upload_files(file, timestamp):

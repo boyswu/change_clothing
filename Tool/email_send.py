@@ -24,8 +24,8 @@ def base64_encode_nickname(nickname):
 
 def send_email(receiver_email):
     # 邮箱账号信息
-    sender_email = "2976699191@qq.com"
-    password = "lrqropzxnbmydcff"
+    sender_email = "yours_emails"
+    password = "yours_key"
     security_code = generate_security_code()  # 使用随机生成的验证码
     # 创建邮件
     message = MIMEMultipart()
@@ -63,8 +63,8 @@ def send_email(receiver_email):
 
 def send_warning_email(receiver_email):
     # 邮箱账号信息
-    sender_email = "2976699191@qq.com"
-    password = "lrqropzxnbmydcff"
+    sender_email = "yours-email"
+    password = "yours-key"
     # 创建邮件
     message = MIMEMultipart()
     nickname = "奇迹衣衣"  # 中文昵称

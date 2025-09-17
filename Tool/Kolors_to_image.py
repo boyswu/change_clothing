@@ -26,7 +26,7 @@ import requests
 import requests
 
 api_url = "https://api.siliconflow.cn/v1/images/generations"
-key = "sk-kmigoyyjgnarzacrdrsrmpgikcjafpoewrttuhjlagdurdyw"
+key = "yours-key"
 headers = {
     "Authorization": key,
     "Content-Type": "application/json"

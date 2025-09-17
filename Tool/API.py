@@ -5,7 +5,7 @@ import uuid
 
 host = 'https://damotryon.market.alicloudapi.com'
 method = 'POST'
-appcode = 'c29f5e38c5b24c38bd8f7332db2b0590'
+appcode = 'yours—code'
 querys = ''
 bodys = {}
 http = urllib3.PoolManager()

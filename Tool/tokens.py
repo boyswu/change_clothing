@@ -9,7 +9,7 @@ from fastapi import Header
 
 # 假设你已经有了MinIO的连接配置
 
-SECRET_KEY = "team2111"  # 请替换为你的密钥
+SECRET_KEY = "yours"  # 请替换为你的密钥
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 10080  # 一周
 

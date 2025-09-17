@@ -2,7 +2,7 @@ import requests
 
 #
 # url = "https://api.siliconflow.cn/v1/images/generations"
-# key = "sk-kmigoyyjgnarzacrdrsrmpgikcjafpoewrttuhjlagdurdyw"
+# key = "yours-key"
 # payload = {
 #     "model": "Kwai-Kolors/Kolors",
 #     "prompt": "an island near sea, with seagulls, moon shining over the sea, light house, boats int he background, "
